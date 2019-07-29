@@ -9,6 +9,8 @@ namespace ActivityGenerator
 {
     internal class Program
     {
+        internal const string Tab = "    ";
+
         private static void Main(string[] args)
         {
             if (!args.Any() || args[0].Equals("--help"))
@@ -17,8 +19,8 @@ namespace ActivityGenerator
                 return;
             }
 
-            string namespaceName = args[0];
-            string className = args[1];
+            string packName = args[0];
+            string activityName = args[1];
 
             int resxIndex = Array.IndexOf(args, "-resx");
             int inIndex = Array.IndexOf(args, "-in");
@@ -34,47 +36,44 @@ namespace ActivityGenerator
                 : 0;
             outArgsCount--;
 
-            string resxFilePath = args.Skip(resxIndex + 1).Take(1).ElementAt(0);
-            string ns = ConstructNamespace(namespaceName);
-            string classText = ConstructClass(className, resxFilePath);
+            string resxFilePath = resxIndex != -1 ? args.Skip(resxIndex + 1).Take(1).ElementAt(0) : null;
             string inArgsText = GetArgumentsText(args.Skip(inIndex + 1).Take(inArgsCount).ToArray(), ArgumentType.In, resxFilePath);
             string outArgs = GetArgumentsText(args.Skip(outIndex + 1).Take(outArgsCount).ToArray(), ArgumentType.Out, resxFilePath);
-            string result = string.Format(ns, string.Format(classText, inArgsText, outArgs));
+            string classText = ConstructClass(activityName, resxFilePath, inArgsText, outArgs);
+            string result = ConstructNamespace(packName, classText);
 
-            File.WriteAllText($"{className}.cs", result);
+            File.WriteAllText($"{activityName}.cs", result);
         }
 
-        private static string ConstructNamespace(string name)
+        private static string ConstructNamespace(string packName, string classText)
         {
             var sb = new StringBuilder();
-            sb.AppendLine("using System;");
             sb.AppendLine("using System.Activities;");
-            sb.AppendLine("using System.Diagnostics;");
-            sb.AppendLine($"using UiPath.{name}.Activities.Properties;");
+            sb.AppendLine($"using UiPath.{packName}.Activities.Properties;");
             sb.AppendLine();
-            sb.AppendLine($"namespace UiPath.{name}.Activities");
-            sb.AppendLine("{{");
-            sb.AppendLine("{0}");
-            sb.AppendLine("}}");
+            sb.AppendLine($"namespace UiPath.{packName}.Activities");
+            sb.AppendLine("{");
+            sb.AppendLine($"{classText}");
+            sb.AppendLine("}");
             return sb.ToString();
         }
 
-        private static string ConstructClass(string name, string resxPath)
+        private static string ConstructClass(string activityName, string resxPath, string inArguments, string outArguments)
         {
-            string displayNameKey = $"{name}DisplayName";
-            string descriptionKey = $"{name}Description";
+            string displayNameKey = $"{activityName}DisplayName";
+            string descriptionKey = $"{activityName}Description";
 
             AddResourceIfNotPresent(resxPath, displayNameKey, "myvalue", "activity name");
             AddResourceIfNotPresent(resxPath, descriptionKey, "myvalue", null);
 
             var sb = new StringBuilder();
-            sb.AppendLine($"\t[LocalizedDisplayName(nameof(Resources.{displayNameKey}))]");
-            sb.AppendLine($"\t[LocalizedDescription(nameof(Resources.{descriptionKey}))]");
-            sb.AppendLine($"\tpublic class {name}");
-            sb.AppendLine("\t{{");
-            sb.Append("{0}");
-            sb.Append("{1}");
-            sb.Append("\t}}");
+            sb.AppendLine($"{Tab}[LocalizedDisplayName(nameof(Resources.{displayNameKey}))]");
+            sb.AppendLine($"{Tab}[LocalizedDescription(nameof(Resources.{descriptionKey}))]");
+            sb.AppendLine($"{Tab}public class {activityName}");
+            sb.AppendLine($"{Tab}{{");
+            sb.Append($"{inArguments}");
+            sb.Append($"{outArguments}");
+            sb.Append($"{Tab}}}");
             return sb.ToString();
         }
 
@@ -100,10 +99,10 @@ namespace ActivityGenerator
             AddResourceIfNotPresent(resxPath, descriptionKey, "myvalue", null);
 
             var sb = new StringBuilder();
-            sb.AppendLine($"\t\t[LocalizedCategory(nameof(Resources.{prefix}put))]");
-            sb.AppendLine($"\t\t[LocalizedDisplayName(nameof(Resources.{displayNameKey}))]");
-            sb.AppendLine($"\t\t[LocalizedDescription(nameof(Resources.{descriptionKey}))]");
-            sb.AppendLine($"\t\tpublic {prefix}Argument<string> {name} {{ get; set; }}");
+            sb.AppendLine($"{Tab}{Tab}[LocalizedCategory(nameof(Resources.{prefix}put))]");
+            sb.AppendLine($"{Tab}{Tab}[LocalizedDisplayName(nameof(Resources.{displayNameKey}))]");
+            sb.AppendLine($"{Tab}{Tab}[LocalizedDescription(nameof(Resources.{descriptionKey}))]");
+            sb.AppendLine($"{Tab}{Tab}public {prefix}Argument<string> {name} {{ get; set; }}");
             return sb.ToString();
         }
 
@@ -136,18 +135,19 @@ namespace ActivityGenerator
 
                 if (!found)
                 {
-                    writer.AddResource(new ResXDataNode(key, value) { Comment = comment});
+                    writer.AddResource(new ResXDataNode(key, value) { Comment = comment });
                 }
             }
         }
 
         private static void WriteHelp()
         {
-            Console.WriteLine("usage: ActivityGenerator.exe namespace activity [-resx resxpath] [-in [in_args...]] [-out [out_args...]]");
+            Console.WriteLine("usage: ActivityGenerator.exe pack activity [-resx resxpath] [-in [in_args...]] [-out [out_args...]]");
             Console.WriteLine("  generates a file <activity>.cs next to executable, containing the boilerplate code for an activity class");
             Console.WriteLine("  options:");
-            Console.WriteLine("    -in:\tlist of input arguments");
-            Console.WriteLine("    -out:\tlist of output arguments");
+            Console.WriteLine($"    -resx:{Tab}path to ResX file");
+            Console.WriteLine($"    -in:{Tab}list of input arguments");
+            Console.WriteLine($"    -out:{Tab}list of output arguments");
         }
 
         private enum ArgumentType
