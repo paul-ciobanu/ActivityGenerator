@@ -23,26 +23,43 @@ namespace ActivityGenerator
             string activityName = args[1];
 
             int resxIndex = Array.IndexOf(args, "-resx");
+            string resxFilePath = resxIndex != -1 ? args.Skip(resxIndex + 1).Take(1).ElementAt(0) : null;
+
+            string[] inArgumentNames = GetInArgumentNames(args);
+            string inArgsText = GetArgumentsText(activityName, inArgumentNames, ArgumentType.In, resxFilePath);
+
+            string[] outArgumentNames = GetOutArgumentNames(args);
+            string outArgs = GetArgumentsText(activityName, outArgumentNames, ArgumentType.Out, resxFilePath);
+
+            string classText = ConstructClass(activityName, resxFilePath, inArgsText, outArgs);
+            string result = ConstructNamespace(packName, classText);
+
+            File.WriteAllText($"{activityName}.cs", result);
+        }
+
+        private static string[] GetInArgumentNames(string[] args)
+        {
             int inIndex = Array.IndexOf(args, "-in");
             int outIndex = Array.IndexOf(args, "-out");
 
             int inArgsCount = inIndex > 0
-                              ? outIndex > 0 ? outIndex - inIndex : args.Length - inIndex
-                              : 0;
+                ? outIndex > 0 ? outIndex - inIndex : args.Length - inIndex
+                : 0;
             inArgsCount--;
+
+            return args.Skip(inIndex + 1).Take(inArgsCount).ToArray();
+        }
+
+        private static string[] GetOutArgumentNames(string[] args)
+        {
+            int outIndex = Array.IndexOf(args, "-out");
 
             int outArgsCount = outIndex > 0
                 ? args.Length - outIndex
                 : 0;
             outArgsCount--;
 
-            string resxFilePath = resxIndex != -1 ? args.Skip(resxIndex + 1).Take(1).ElementAt(0) : null;
-            string inArgsText = GetArgumentsText(args.Skip(inIndex + 1).Take(inArgsCount).ToArray(), ArgumentType.In, resxFilePath);
-            string outArgs = GetArgumentsText(args.Skip(outIndex + 1).Take(outArgsCount).ToArray(), ArgumentType.Out, resxFilePath);
-            string classText = ConstructClass(activityName, resxFilePath, inArgsText, outArgs);
-            string result = ConstructNamespace(packName, classText);
-
-            File.WriteAllText($"{activityName}.cs", result);
+            return args.Skip(outIndex + 1).Take(outArgsCount).ToArray();
         }
 
         private static string ConstructNamespace(string packName, string classText)
@@ -77,23 +94,23 @@ namespace ActivityGenerator
             return sb.ToString();
         }
 
-        private static string GetArgumentsText(string[] args, ArgumentType type, string resxPath)
+        private static string GetArgumentsText(string activityName, string[] args, ArgumentType type, string resxPath)
         {
             var sb = new StringBuilder();
 
             foreach (string arg in args)
             {
-                sb.AppendLine(GetArgument(arg, type, resxPath));
+                sb.AppendLine(GetArgument(activityName, arg, type, resxPath));
             }
 
             return sb.ToString();
         }
 
-        private static string GetArgument(string name, ArgumentType type, string resxPath)
+        private static string GetArgument(string activityName, string name, ArgumentType type, string resxPath)
         {
             string prefix = type == ArgumentType.In ? "In" : "Out";
-            string displayNameKey = $"{name}DisplayName";
-            string descriptionKey = $"{name}Description";
+            string displayNameKey = $"{activityName}_{name}DisplayName";
+            string descriptionKey = $"{activityName}_{name}Description";
 
             AddResourceIfNotPresent(resxPath, displayNameKey, "myvalue", "property name");
             AddResourceIfNotPresent(resxPath, descriptionKey, "myvalue", null);
